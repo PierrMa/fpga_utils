@@ -7,7 +7,7 @@ Port (
     E: in std_logic_vector(N-1 downto 0);
     S: out std_logic_vector(N-1 downto 0)
 );
-end BinatyToGrayConveter;
+end BinaryToGrayConverter;
 
 architecture Behavioral of BinaryToGrayConverter is
 
