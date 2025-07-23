@@ -27,7 +27,8 @@ end uart_tb;
 
 architecture Behavioral of uart_tb is
 constant N : integer :=8;
-constant NB_CLK_TO_SYNC : integer := 4;
+constant DATA_RATE : integer := 2;
+constant CLK_FREQUENCE : integer := 8;
 signal data_in,data_out_r : std_logic_vector(N-1 downto 0);
 signal data_out : std_logic;
 signal clk : std_logic := '1';
@@ -38,7 +39,7 @@ signal data_valid : std_logic;
 begin
 
     transmitter : entity work.uart_transmitter
-    generic map(N=>N, NB_CLK_TO_SYNC=> NB_CLK_TO_SYNC)
+    generic map(N => N, DATA_RATE => DATA_RATE, CLK_FREQUENCE => CLK_FREQUENCE)
     port map(
         data_in => data_in,
         data_out => data_out,
@@ -49,7 +50,7 @@ begin
     );
     
     receiver : entity work.uart_receiver
-    generic map(N=>N, NB_CLK_TO_SYNC=> NB_CLK_TO_SYNC)
+    generic map(N => N, DATA_RATE => DATA_RATE, CLK_FREQUENCE => CLK_FREQUENCE)
     port map(
         data_in => data_out,
         data_out => data_out_r,

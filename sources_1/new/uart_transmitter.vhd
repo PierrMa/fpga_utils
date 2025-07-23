@@ -26,8 +26,7 @@ entity uart_transmitter is
 generic(
     N : integer :=8; -- data size
     DATA_RATE : integer := 115200;
-    CLK_FREQUENCE : integer := 100000000;
-    NB_CLK_TO_SYNC : integer := 868 -- =CLK_FREQUENCE/DATA_RATE
+    CLK_FREQUENCE : integer := 100000000
 );
 Port (
     data_in : in std_logic_vector(N-1 downto 0);
@@ -39,8 +38,17 @@ Port (
 end uart_transmitter;
 
 architecture Behavioral of uart_transmitter is
+function process_bit_period( clk_f : integer; baud: integer)
+return integer is variable bit_period : integer;
+begin
+    return clk_f/baud;
+end function;
+
+constant NB_CLK_TO_SYNC : integer := process_bit_period(CLK_FREQUENCE,DATA_RATE);
 constant DATA_SIZE_WITH_HEADER : integer := N+3;
+
 type fsm_t is (IDLE, TRANSFER, WAIT_CLK);
+
 signal state : fsm_t;
 signal clk_count : integer range 0 to NB_CLK_TO_SYNC-1;
 signal index : integer range 0  to DATA_SIZE_WITH_HEADER;

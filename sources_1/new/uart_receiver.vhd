@@ -26,8 +26,7 @@ entity uart_receiver is
 generic(
     N : integer :=8; -- data size
     DATA_RATE : integer := 115200;
-    CLK_FREQUENCE : integer := 100000000;
-    NB_CLK_TO_SYNC : integer := 868 -- =CLK_FREQUENCE/DATA_RATE
+    CLK_FREQUENCE : integer := 100000000
 );
 Port (
     data_in : in std_logic;
@@ -39,7 +38,16 @@ Port (
 end uart_receiver;
 
 architecture Behavioral of uart_receiver is
+function process_bit_period( clk_f : integer; baud: integer)
+return integer is variable bit_period : integer;
+begin
+    return clk_f/baud;
+end function;
+
+constant NB_CLK_TO_SYNC : integer := process_bit_period(CLK_FREQUENCE,DATA_RATE);
+
 type fsm_t is (IDLE, MIDDLE, RECEPTION, WAIT_CLK);
+
 signal state : fsm_t;
 signal index : integer range 0 to N+1; --allow to count data bits but also parity and stop bits
 signal clk_count : integer range 0 to NB_CLK_TO_SYNC-1;
@@ -47,8 +55,21 @@ signal ready : std_logic;
 signal parity_r: std_logic; --parity-bit received
 signal parity_c: std_logic; --parity-bit calculated
 signal data_s : std_logic_vector(N-1 downto 0);
+signal data_in_sync : std_logic_vector(1 downto 0);
 begin
 
+    --to prevent metastability
+    process(clk,rst)
+    begin
+        if rst = '1' then
+            data_in_sync(0) <= '0';
+            data_in_sync(1) <= '0';
+        elsif rising_edge(clk) then
+            data_in_sync(0) <= data_in;
+            data_in_sync(1) <= data_in_sync(0);
+        end if;
+    end process;
+    
     process(clk,rst)
      variable temp : std_logic := '0';
     begin
@@ -62,7 +83,7 @@ begin
         elsif rising_edge(clk) then
             case(state) is
             when IDLE =>
-                if data_in = '0' then --START bit
+                if data_in_sync(1) = '0' then --START bit
                     clk_count <= clk_count+1;
                     ready <= '0';
                     state <= MIDDLE;
@@ -74,7 +95,7 @@ begin
             when MIDDLE => --find de middle of the bit
                 if clk_count = (NB_CLK_TO_SYNC-1)/2 then
                     clk_count <= 0;
-                    if data_in = '0' then
+                    if data_in_sync(1) = '0' then
                         state <= WAIT_CLK;
                     else
                         state <= IDLE;
@@ -87,7 +108,7 @@ begin
                 if clk_count = NB_CLK_TO_SYNC-1 then
                     clk_count <= 0;
                     if index < N then --reception of data
-                        data_s(index) <= data_in;
+                        data_s(index) <= data_in_sync(1);
                         state <= RECEPTION;
                     elsif index = N then --reception of parity bit
                         --process parity bit
@@ -95,11 +116,11 @@ begin
                             temp := temp xor data_s(i);
                         end loop;
                         parity_c <= temp;
-                        parity_r <= data_in;
+                        parity_r <= data_in_sync(1);
                         state <= RECEPTION;
                     elsif index = N+1 then
                         data_valid <= not(parity_c xor parity_r);
-                        done <= data_in;
+                        done <= data_in_sync(1);
                         state <= RECEPTION;
                     end if;
                 elsif clk_count < NB_CLK_TO_SYNC-1 then
