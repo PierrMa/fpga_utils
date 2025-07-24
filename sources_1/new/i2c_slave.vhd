@@ -132,6 +132,8 @@ begin
                     if rw = '0' then --master write
                         data_out <= data_s;
                         sda_s <= '0'; -- slave ACK
+                    else
+                        sda_s <= sda;
                     end if;
                     state <= ACK_DATA2;
                 end if;
@@ -139,9 +141,9 @@ begin
                 if scl = '1' then
                     if rw = '1' then --master read
                         --check if master want to read other data
-                        if sda = '0' then --master ACK
+                        if sda_s = '0' then --master ACK
                             state <= WRITE1;
-                        elsif sda = '1' then --master NACK
+                        elsif sda_s = '1' then --master NACK
                             state <= STOP1;
                         end if;
                     elsif rw = '0' then --master write

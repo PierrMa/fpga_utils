@@ -26,7 +26,7 @@ use IEEE.NUMERIC_STD.ALL;
 entity i2c_master is
 generic(
     BAUD : integer := 100000; --i2c standard frequency (100kbit/s)
-    F_CLK : integer := 100000000
+    F_CLK : integer := 100000000 --system clock
 );
 Port (
     clk,rst : in std_logic;
@@ -38,7 +38,8 @@ Port (
     sda : inout std_logic;
     sda_direction : out std_logic; --'1' for master output, '0' for master input
     go : in std_logic; --there is a data to write or to read
-    done : out std_logic
+    done : out std_logic;
+    last_byte : in std_logic
 );
 end i2c_master;
 
@@ -54,7 +55,7 @@ end function;
 
 constant HALF_PERIOD : integer := process_half_bit_rate(F_CLK,BAUD);
 
-type fsm_t is (IDLE,START1,START2,ADDR1,ADDR2,ACK1,ACK2,READ1,READ2,NACK1,NACK2,WRITE1,WRITE2,ACK1B,ACK2B,STOP1,STOP2,CLEAN);
+type fsm_t is (IDLE,START1,START2,ADDR1,ADDR2,ACK_ADDR1,ACK_ADDR2,READ1,READ2,ACK_R1,ACK_R2,WRITE1,WRITE2,ACK_W1,ACK_W2,STOP1,STOP2,CLEAN);
 signal state : fsm_t;
 signal data : std_logic_vector(7 downto 0);
 signal addr_rw : std_logic_vector(7 downto 0);
@@ -83,7 +84,7 @@ begin
         end if;
     end process;
     
-    process(clk,rst,state,scl_tick)
+    process(clk,rst,state,scl_tick,last_byte)
     begin
         if rst = '1' then 
             state <= IDLE;
@@ -134,18 +135,18 @@ begin
                     scl <= '1';
                     if index = 0 then
                         index <= 7;
-                        state <= ACK1;
+                        state <= ACK_ADDR1;
                     elsif index > 0 then
                         index <= index - 1;
                         state <= ADDR1;
                     end if;
                 
-                when ACK1 =>
+                when ACK_ADDR1 =>
                     sda_dir_s <= '0';
                     scl <= '0';
-                    state <= ACK2;
+                    state <= ACK_ADDR2;
                     
-                when ACK2 =>
+                when ACK_ADDR2 =>
                     scl <= '1';
                     if sda = '0' then --SLAVE ACK
                         index <= 7;
@@ -168,22 +169,30 @@ begin
                     data(index) <= sda;
                     if index = 0 then
                         index <= 7;
-                        state <= NACK1;
+                        state <= ACK_R1;
                     elsif index > 0 then
                         index <= index - 1;
                         state <= READ1;
                     end if;
                 
-                when NACK1 =>
+                when ACK_R1 =>
                     data_out <= data;
                     sda_dir_s <= '1';
                     scl <= '0';
-                    sda_s <= '1';
-                    state <= NACK2;
-                
-                when NACK2 =>
+                    state <= ACK_R2;
+                    if last_byte = '1' then
+                        sda_s <= '1'; --master NACK
+                    else
+                        sda_s <= '0'; --master ACK
+                    end if;
+                when ACK_R2 =>
                     scl <= '1';
-                    state <= STOP1;
+                    if last_byte = '1' then
+                        state <= STOP1;
+                    else
+                        sda_dir_s <= '0';
+                        state <= READ1;
+                    end if;
                         
                 when WRITE1 =>
                     sda_dir_s <= '1';
@@ -195,18 +204,18 @@ begin
                     scl <= '1';
                     if index = 0 then
                         index <= 7;
-                        state <= ACK1B;
+                        state <= ACK_W1;
                     elsif index > 0 then
                         index <= index-1;
                         state <= WRITE1;
                     end if;
                 
-                when ACK1B =>
+                when ACK_W1 =>
                     sda_dir_s <= '0';
                     scl <= '0';
-                    state <= ACK2B;
+                    state <= ACK_W2;
                 
-                when ACK2B =>
+                when ACK_W2 =>
                     scl <= '1';
                     state <= STOP1;
                     
