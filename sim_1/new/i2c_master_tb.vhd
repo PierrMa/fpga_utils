@@ -18,7 +18,6 @@
 -- 
 ----------------------------------------------------------------------------------
 
-
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 
@@ -46,6 +45,7 @@ port (
     done : out std_logic
 );
 end component;
+
 constant BAUD : integer := 2;
 constant F_CLK : integer := 4;
 constant CLK_PERIOD : time := 10ns;
@@ -63,9 +63,9 @@ signal done : std_logic;
 signal sda_dir : std_logic;
 begin
 
-    dut : i2c_master
+    master : i2c_master
     generic map(BAUD, F_CLK)
-    port map(clk,rst,data_in,data_out,address,rw,scl,sda,sda_dir,go,done);
+    port map(clk=>clk,rst=>rst,data_in=>data_in,data_out=>data_out,address=>address,rw=>rw,scl=>scl,sda=>sda,sda_direction=>sda_dir,go=>go,done=>done);
     
     clk <= not(clk) after 5ns;
     rst <= '0' after 10ns;
@@ -142,13 +142,11 @@ begin
         wait for SCL_PERIOD*2;
         --READ2 => READ1
         sda_s <= '0';
-        wait for SCL_PERIOD*3;
-        --READ2 => NACK1 => NACK2
-        assert data_out = "10101010" report "Error : data read is different of data sent by the slave" severity error;
         wait for SCL_PERIOD*4;
-        --STOP1 => STOP2 => CLEAN => IDLE
-        
-        
+        --READ2 => NACK1 => NACK2 => STOP1
+        assert data_out = "10101010" report "Error : data read is different of data sent by the slave" severity error;
+        wait for SCL_PERIOD*3;
+        --STOP2 => CLEAN => IDLE        
     end process;
     sda <= sda_s when sda_dir = '0' else 'Z';
 end Behavioral;

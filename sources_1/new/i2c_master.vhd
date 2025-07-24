@@ -161,14 +161,13 @@ begin
                 when READ1 =>
                     sda_dir_s <= '0';
                     scl <= '0';
-                    data(index) <= sda;
                     state <= READ2;
                 
                 when READ2 =>
                     scl <= '1';
+                    data(index) <= sda;
                     if index = 0 then
                         index <= 7;
-                        data_out <= data;
                         state <= NACK1;
                     elsif index > 0 then
                         index <= index - 1;
@@ -176,6 +175,7 @@ begin
                     end if;
                 
                 when NACK1 =>
+                    data_out <= data;
                     sda_dir_s <= '1';
                     scl <= '0';
                     sda_s <= '1';

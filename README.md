@@ -15,3 +15,5 @@ Here are the components found in this repository:
 - converter (gray code to binary, binary to gray code)
 - synchronous FIFO
 - asynchronous FIFO
+- uart interface (transmitter and receiver)
+- i2c interface (master and slave)
