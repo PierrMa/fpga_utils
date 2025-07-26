@@ -21,7 +21,6 @@
 
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
-use IEEE.NUMERIC_STD.ALL;
 
 entity i2c_master is
 generic(
@@ -34,12 +33,14 @@ Port (
     data_out : out std_logic_vector(7 downto 0);
     address : in std_logic_vector(6 downto 0);
     rw : in std_logic; -- '1' to read, '0' to write
-    scl : out std_logic;
+    scl_out : out std_logic;
     sda : inout std_logic;
     sda_direction : out std_logic; --'1' for master output, '0' for master input
     go : in std_logic; --there is a data to write or to read
     done : out std_logic;
-    last_byte : in std_logic
+    last_byte : in std_logic;
+    conflict: in std_logic;
+    scl_in : in std_logic
 );
 end i2c_master;
 
@@ -64,6 +65,7 @@ signal index : integer range 0 to 7;
 signal scl_tick : std_logic := '0';
 signal sda_s : std_logic;
 signal sda_dir_s : std_logic; --'1' for master output, '0' for master input
+signal scl_out_s :std_logic;
 
 begin
     
@@ -94,151 +96,192 @@ begin
             sda_dir_s <= '0';
             data_out <= (others =>'0');
             sda_s <= '1';
-            scl <= '1';
+            scl_out_s <= '1';
             done <= '0';
         elsif rising_edge(clk) then
             if scl_tick = '1' then
-                case(state) is
-                when IDLE =>
-                    index <= 7;
-                    sda_dir_s <= '0';
-                    scl <= '1';
-                    sda_s <= '1'; --the resting state of SDA is '1'
-                    done <= '0';
-                    
-                    if go = '1' then
-                        data <= data_in;
-                        addr_rw <= address&rw;
-                        state <= START1;
-                    else 
-                        state <= IDLE;
-                    end if;
-                
-                when START1 =>
-                    sda_dir_s <= '1';
-                    scl <= '1';
-                    sda_s <= '1';
-                    state <= START2;
-                
-                when START2 =>
-                    scl <= '1';
-                    sda_s <= '0';
-                    index <= 7;
-                    state <= ADDR1;
-                
-                when ADDR1 =>
-                    scl <= '0';
-                    sda_s <= addr_rw(index);
-                    state <= ADDR2;
-                    
-                when ADDR2 =>
-                    scl <= '1';
-                    if index = 0 then
+                if conflict = '1' then
+                    state <= IDLE;
+                else
+                    case(state) is
+                    when IDLE =>
                         index <= 7;
-                        state <= ACK_ADDR1;
-                    elsif index > 0 then
-                        index <= index - 1;
-                        state <= ADDR1;
-                    end if;
-                
-                when ACK_ADDR1 =>
-                    sda_dir_s <= '0';
-                    scl <= '0';
-                    state <= ACK_ADDR2;
-                    
-                when ACK_ADDR2 =>
-                    scl <= '1';
-                    if sda = '0' then --SLAVE ACK
-                        index <= 7;
-                        if rw = '1' then
-                            state <= READ1;
+                        sda_dir_s <= '0';
+                        scl_out_s <= '1';
+                        sda_s <= '1'; --the resting state of SDA is '1'
+                        done <= '0';
+                        
+                        if go = '1' then
+                            data <= data_in;
+                            addr_rw <= address&rw;
+                            state <= START1;
                         else 
+                            state <= IDLE;
+                        end if;
+                    
+                    when START1 =>
+                        sda_dir_s <= '1';
+                        scl_out_s <= '1';
+                        sda_s <= '1';
+                        state <= START2;
+                    
+                    when START2 =>
+                        if scl_in /= scl_out_s then
+                            state <= START2;
+                        else
+                            scl_out_s <= '1';
+                            sda_s <= '0';
+                            index <= 7;
+                            state <= ADDR1;
+                        end if;
+                    
+                    when ADDR1 =>
+                        if scl_in /= scl_out_s then
+                            state <= ADDR1;
+                        else
+                            scl_out_s <= '0';
+                            sda_s <= addr_rw(index);
+                            state <= ADDR2;
+                        end if;
+                        
+                    when ADDR2 =>
+                        scl_out_s <= '1';
+                        if index = 0 then
+                            index <= 7;
+                            state <= ACK_ADDR1;
+                        elsif index > 0 then
+                            index <= index - 1;
+                            state <= ADDR1;
+                        end if;
+                    
+                    when ACK_ADDR1 =>
+                        if scl_in /= scl_out_s then
+                            state <= ACK_ADDR1;
+                        else
+                            sda_dir_s <= '0';
+                            scl_out_s <= '0';
+                            state <= ACK_ADDR2;
+                        end if;
+                        
+                    when ACK_ADDR2 =>
+                        scl_out_s <= '1';
+                        if sda = '0' then --SLAVE ACK
+                            index <= 7;
+                            if rw = '1' then
+                                state <= READ1;
+                            else 
+                                state <= WRITE1;
+                            end if;
+                        else --SLAVE NACK
+                            state <= STOP1;
+                        end if;
+                        
+                    when READ1 =>
+                        if scl_in /= scl_out_s then
+                            state <= READ1;
+                        else
+                            sda_dir_s <= '0';
+                            scl_out_s <= '0';
+                            state <= READ2;
+                        end if;
+                    
+                    when READ2 =>
+                        scl_out_s <= '1';
+                        data(index) <= sda;
+                        if index = 0 then
+                            index <= 7;
+                            state <= ACK_R1;
+                        elsif index > 0 then
+                            index <= index - 1;
+                            state <= READ1;
+                        end if;
+                    
+                    when ACK_R1 =>
+                        if scl_in /= scl_out_s then
+                            state <= ACK_R1;
+                        else
+                            data_out <= data;
+                            sda_dir_s <= '1';
+                            scl_out_s <= '0';
+                            state <= ACK_R2;
+                            if last_byte = '1' then
+                                sda_s <= '1'; --master NACK
+                            else
+                                sda_s <= '0'; --master ACK
+                            end if;
+                        end if;
+                    when ACK_R2 =>
+                        scl_out_s <= '1';
+                        if last_byte = '1' then
+                            state <= STOP1;
+                        else
+                            sda_dir_s <= '0';
+                            state <= READ1;
+                        end if;
+                            
+                    when WRITE1 =>
+                        if scl_in /= scl_out_s then
+                            state <= WRITE1;
+                        else
+                            sda_dir_s <= '1';
+                            scl_out_s <= '0';
+                            sda_s <= data(index);
+                            state <= WRITE2;
+                        end if;
+                    
+                    when WRITE2 =>
+                        scl_out_s <= '1';
+                        if index = 0 then
+                            index <= 7;
+                            state <= ACK_W1;
+                        elsif index > 0 then
+                            index <= index-1;
                             state <= WRITE1;
                         end if;
-                    else --SLAVE NACK
-                        state <= STOP1;
-                    end if;
                     
-                when READ1 =>
-                    sda_dir_s <= '0';
-                    scl <= '0';
-                    state <= READ2;
-                
-                when READ2 =>
-                    scl <= '1';
-                    data(index) <= sda;
-                    if index = 0 then
-                        index <= 7;
-                        state <= ACK_R1;
-                    elsif index > 0 then
-                        index <= index - 1;
-                        state <= READ1;
-                    end if;
-                
-                when ACK_R1 =>
-                    data_out <= data;
-                    sda_dir_s <= '1';
-                    scl <= '0';
-                    state <= ACK_R2;
-                    if last_byte = '1' then
-                        sda_s <= '1'; --master NACK
-                    else
-                        sda_s <= '0'; --master ACK
-                    end if;
-                when ACK_R2 =>
-                    scl <= '1';
-                    if last_byte = '1' then
+                    when ACK_W1 =>
+                        if scl_in /= scl_out_s then
+                            state <= ACK_W1;
+                        else
+                            sda_dir_s <= '0';
+                            scl_out_s <= '0';
+                            state <= ACK_W2;
+                        end if;
+                    
+                    when ACK_W2 =>
+                        scl_out_s <= '1';
                         state <= STOP1;
-                    else
-                        sda_dir_s <= '0';
-                        state <= READ1;
-                    end if;
                         
-                when WRITE1 =>
-                    sda_dir_s <= '1';
-                    scl <= '0';
-                    sda_s <= data(index);
-                    state <= WRITE2;
-                
-                when WRITE2 =>
-                    scl <= '1';
-                    if index = 0 then
-                        index <= 7;
-                        state <= ACK_W1;
-                    elsif index > 0 then
-                        index <= index-1;
-                        state <= WRITE1;
-                    end if;
-                
-                when ACK_W1 =>
-                    sda_dir_s <= '0';
-                    scl <= '0';
-                    state <= ACK_W2;
-                
-                when ACK_W2 =>
-                    scl <= '1';
-                    state <= STOP1;
+                    when STOP1 =>
+                        if scl_in /= scl_out_s then
+                            state <= STOP1;
+                        else
+                            sda_dir_s <= '1';
+                            scl_out_s <= '1';
+                            sda_s <= '0';
+                            state <= STOP2;
+                        end if;
                     
-                when STOP1 =>
-                    sda_dir_s <= '1';
-                    scl <= '1';
-                    sda_s <= '0';
-                    state <= STOP2;
-                
-                when STOP2 =>
-                    scl <= '1';
-                    sda_s <= '1';
-                    state <= CLEAN;
+                    when STOP2 =>
+                        if scl_in /= scl_out_s then
+                            state <= STOP2;
+                        else
+                            scl_out_s <= '1';
+                            sda_s <= '1';
+                            state <= CLEAN;
+                        end if;
+                        
+                    when CLEAN =>
+                        done <= '1';
+                        state <= IDLE;
                     
-                when CLEAN =>
-                    done <= '1';
-                    state <= IDLE;
-                    
-                end case;
+                    end case;
+                end if;
             end if;
         end if;
     end process;
 
     sda_direction <= sda_dir_s;
     sda <= sda_s when sda_dir_s = '1' else 'Z';
+    scl_out <= scl_out_s;
 end Behavioral;
