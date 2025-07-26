@@ -75,8 +75,6 @@ signal sda_dir : std_logic;
 signal data_in_s, data_out_s : std_logic_vector(7 downto 0);
 signal stop_error : std_logic;
 signal last_byte : std_logic := '0';
-signal sim_data : std_logic_vector(7 downto 0);
-signal sim_addr : std_logic_vector(6 downto 0);
 
 procedure write(
     constant data : in std_logic_vector(7 downto 0);

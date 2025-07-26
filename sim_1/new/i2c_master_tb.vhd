@@ -42,7 +42,8 @@ port (
     sda : inout std_logic;
     sda_direction : out std_logic; --'1' for master output, '0' for master input
     go : in std_logic; --there is a data to write or to read
-    done : out std_logic
+    done : out std_logic;
+    last_byte : in std_logic
 );
 end component;
 
@@ -61,11 +62,12 @@ signal sda_s : std_logic :='Z'; -- sda from testbench driven by the slave i2c
 signal go : std_logic := '0';
 signal done : std_logic;
 signal sda_dir : std_logic;
+signal last_byte : std_logic:='1';
 begin
 
     master : i2c_master
     generic map(BAUD, F_CLK)
-    port map(clk=>clk,rst=>rst,data_in=>data_in,data_out=>data_out,address=>address,rw=>rw,scl=>scl,sda=>sda,sda_direction=>sda_dir,go=>go,done=>done);
+    port map(clk=>clk,rst=>rst,data_in=>data_in,data_out=>data_out,address=>address,rw=>rw,scl=>scl,sda=>sda,sda_direction=>sda_dir,go=>go,done=>done,last_byte=>last_byte);
     
     clk <= not(clk) after 5ns;
     rst <= '0' after 10ns;
