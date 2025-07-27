@@ -41,14 +41,16 @@ signal sda_com_s : std_logic:='1';
 signal sda_dir_s : std_logic:='0';
 signal scl_com_s : std_logic:='1';
 begin
+    
     sda_from_slave : for i in 0 to NB_MASTER-1 generate
-        sda(i) <= sda_com when sda_dir_in(i)='0' else 'Z';
+        sda(i) <= sda_com when sda_dir_s = '0' else 'Z';
     end generate;
     
     or_sda_dir : process(sda_dir_in)
         variable sda_dir_v : std_logic := '0';
     begin
-        for i in 0 to NB_MASTER-1 loop
+        sda_dir_v := sda_dir_in(0) or sda_dir_in(1);
+        for i in 2 to NB_MASTER-1 loop
             sda_dir_v := sda_dir_v or sda_dir_in(i);
         end loop;
         sda_dir_s <= sda_dir_v;
@@ -56,14 +58,28 @@ begin
     sda_dir_com <= sda_dir_s;
     
     conflict_gen : for i in 0 to NB_MASTER-1 generate
-        conflict(i) <= not(sda(i) xnor sda_com) and sda_dir_in(i);
+        conflict(i) <= not(sda(i) xnor sda_com) and sda_dir_in(i);--'1' when (sda(i) /= sda_com) and sda_dir_in(i) = '1' else '0';
     end generate;
     
-    and_sda : process(sda_dir_in,sda)
+    and_sda : process(sda)
         variable sda_com_v : std_logic := '1';
     begin
-        for i in 0 to NB_MASTER-1 loop
-            sda_com_v := sda_com_v and (sda(i) and sda_dir_in(i));
+        if sda_dir_in(1 downto 0) = "01" then
+            sda_com_v := sda(1);
+        elsif sda_dir_in(1 downto 0) = "10" then
+            sda_com_v := sda(0);
+        elsif sda_dir_in(1 downto 0) = "00" then
+            sda_com_v := '1';
+        else 
+            sda_com_v := sda(1) and sda(0);
+        end if;
+        
+        for i in 2 to NB_MASTER-1 loop
+            if sda_dir_in(i) = '1' then
+                sda_com_v := sda_com_v and sda(i);
+            else
+                sda_com_v := sda_com_v and '1';
+            end if;
         end loop;
         sda_com_s <= sda_com_v;
     end process;
@@ -72,7 +88,8 @@ begin
     and_scl : process(scl_in)
         variable scl_com_v : std_logic := '1';
     begin
-        for i in 0 to NB_MASTER-1 loop
+        scl_com_v := scl_in(0) and scl_in(1);
+        for i in 2 to NB_MASTER-1 loop
             scl_com_v := scl_com_v and scl_in(i);
         end loop;
         scl_com_s <= scl_com_v;
