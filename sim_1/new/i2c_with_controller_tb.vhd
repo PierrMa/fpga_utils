@@ -70,7 +70,7 @@ end component;
 
 component i2c_slave
 Port (
-    clk,rst : std_logic;
+    clk,rst : in std_logic;
     scl : in std_logic;
     sda : inout std_logic;
     sda_dir : in std_logic; --'1' for master output, '0' for master input

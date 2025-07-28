@@ -22,7 +22,7 @@ use IEEE.STD_LOGIC_1164.ALL;
 
 entity i2c_slave is
 Port (
-    clk,rst : std_logic;
+    clk,rst : in std_logic;
     scl : in std_logic;
     sda : inout std_logic;
     sda_dir : in std_logic; --'1' for master output, '0' for master input
