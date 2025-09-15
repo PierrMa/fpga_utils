@@ -21,7 +21,7 @@ architecture Behavioral of async_fifo is
 constant idx_width : integer := integer(ceil(log2(real(depth))));
 type fifo_t is array(0 to depth-1) of std_logic_vector(width-1 downto 0);
 signal data : fifo_t := (others => (others =>'0'));
-signal w_index, r_index : std_logic_vector(idx_width downto 0);
+signal w_index, r_index : std_logic_vector(idx_width downto 0):= (others=>'0');
 signal gray_w_index, gray_r_index : std_logic_vector(idx_width downto 0);
 signal buf1_gray_w_index, buf1_gray_r_index : std_logic_vector(idx_width downto 0);
 signal buf2_gray_w_index, buf2_gray_r_index : std_logic_vector(idx_width downto 0);
