@@ -86,10 +86,10 @@ begin
     --double buffering of gray index
     process(r_clk,r_rst)
     begin
-        if w_rst='1' then 
+        if r_rst='1' then 
             buf1_gray_w_index <= (others => '0');
             buf2_gray_w_index <= (others => '0');
-        elsif rising_edge(w_clk) then
+        elsif rising_edge(r_clk) then
             buf1_gray_w_index <= gray_w_index;
             buf2_gray_w_index <= buf1_gray_w_index;
         end if;
@@ -97,10 +97,10 @@ begin
     
     process(w_clk,w_rst)
     begin
-        if r_rst='1' then 
+        if w_rst='1' then 
             buf1_gray_r_index <= (others => '0');
             buf2_gray_r_index <= (others => '0');
-        elsif rising_edge(r_clk) then
+        elsif rising_edge(w_clk) then
             buf1_gray_r_index <= gray_r_index;
             buf2_gray_r_index <= buf1_gray_r_index;
         end if;
